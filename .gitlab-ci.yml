@@ -1,0 +1,46 @@
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "master"
+
+
+image: python:3.7.6
+
+variables:
+  WORK_DIR: .
+  DOCKER_FILE: Dockerfile
+  DOCKER_BUILD_CONTEXT: .
+  IMAGE_NAME: dev.t3q.ai:31885/fast-search-api:1.0
+stages:
+  - build
+  - deploy
+
+build:
+  stage: package
+  tags:
+    - gitlab-t3qai-dev-tag
+  image: docker:latest
+  services:
+    - docker:dind
+  stage: build
+  script:
+    - docker system prune
+    - ls -al
+    - docker container ls -a
+    - docker login -u admin -p admin123 http://dev.t3q.ai:31885
+    - docker build . -t $IMAGE_NAME
+    - docker push $IMAGE_NAME
+
+deploy:
+  stage: deploy
+  tags:
+    - gitlab-t3qai-dev-tag
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - docker login -u admin -p admin123 http://dev.t3q.ai:31885
+    - docker container ls -a
+    - docker container rm -f fast-search-api
+    - docker run -d -p 8765:8000 --env-file=.env --add-host mou01:192.168.0.81 --add-host mou02:192.168.0.82 --add-host mou03:192.168.0.83 --add-host mou04:192.168.0.84 --add-host mou05:192.168.0.85 --name fast-search-api --restart always $IMAGE_NAME
+    - docker container ls -a
+
